@@ -1,17 +1,14 @@
-
 <!DOCTYPE html>
 <html lang="th" class="scroll-smooth">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>พอร์ตโฟลิโอ | ด.ช.กลวัชร โพธิวัฒนานนท์ (เตรียมวิศวกรรมโยธา)</title>
-    
-    <!-- Google Fonts: Prompt -->
+    <title>พอร์ตโฟลิโอ | ด.ช.กลวัชร โพธิวัฒนานนท์ (เตรียมนักวิทยาศาสตร์)</title>
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
-    <!-- Tailwind CSS via CDN -->
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=Kanit:wght@600;700;800&display=swap" rel="stylesheet">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -19,52 +16,606 @@
                 extend: {
                     fontFamily: {
                         sans: ['Prompt', 'sans-serif'],
+                        display: ['Kanit', 'sans-serif'],
                     },
                     colors: {
-                        blueprint: {
-                            DEFAULT: '#0f172a', // Slate 900
-                            card: '#1e293b',    // Slate 800
-                            light: '#334155'   // Slate 700
+                        blueprint: { DEFAULT: '#080B1F', card: '#121736', light: '#1C2350' },
+                        hivis: {
+                            yellow: '#F7E100',
+                            orange: '#FF5A00',
+                            cyan: '#00E5FF',
+                            pink: '#FF2E92',
+                            green: '#22FFA6',
+                            violet: '#9D6BFF',
                         },
-                        concrete: {
-                            DEFAULT: '#64748b', // Slate 500
-                            light: '#94a3b8',   // Slate 400
-                            bg: '#f8fafc'       // Slate 50
-                        },
-                        safety: {
-                            DEFAULT: '#f97316', // Orange 500
-                            hover: '#ea580c'    // Orange 600
-                        }
+                        concrete: { DEFAULT: '#8A93B8', light: '#B7BEDD', bg: '#f8fafc' },
                     }
                 }
             }
         }
     </script>
+    <style>
+        body { cursor: default; }
+        .letter-drag {
+            display: inline-block;
+            cursor: grab;
+            user-select: none;
+            touch-action: none;
+            position: relative;
+            transition: transform 0.15s ease, color 0.2s ease;
+            will-change: transform;
+            z-index: 1;
+        }
+        .letter-drag.is-mark {
+            min-width: 0.6em;
+            margin-right: -0.6em;
+            z-index: 3;
+        }
+        .letter-drag:active { cursor: grabbing; }
+        .letter-drag.dragging {
+            z-index: 50;
+            transition: none;
+            color: var(--drag-color, #00E5FF);
+            text-shadow: 0 0 18px var(--drag-glow, rgba(0,229,255,0.7));
+        }
+        .parallax-layer { will-change: transform; transition: transform 0.1s linear; }
+        ::selection { background: #FF5A00; color: #080B1F; }
+        .grid-bg {
+            background-image:
+                linear-gradient(to right, rgba(0,229,255,0.15) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(0,229,255,0.15) 1px, transparent 1px);
+            background-size: 4rem 4rem;
+        }
+        .glow-card { transform-style: preserve-3d; transition: transform 0.15s ease, box-shadow 0.3s ease; }
+        .glow-card:hover { box-shadow: 0 0 0 1px rgba(0,229,255,0.4), 0 0 30px -5px rgba(157,107,255,0.35); }
+
+        /* ---------- Custom cursor ---------- */
+        @media (pointer: fine) {
+            body { cursor: none; }
+            a, button, .letter-drag { cursor: none; }
+        }
+        #cursor-dot, #cursor-ring {
+            position: fixed;
+            top: 0; left: 0;
+            pointer-events: none;
+            z-index: 9999;
+            transform: translate(-50%, -50%);
+        }
+        #cursor-dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: #F7E100;
+            box-shadow: 0 0 8px 2px rgba(247,225,0,0.8);
+        }
+        #cursor-ring {
+            width: 34px; height: 34px;
+            border-radius: 50%;
+            border: 2px solid #00E5FF;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            transition: width 0.2s ease, height 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+        }
+        #cursor-ring.hover-link {
+            width: 52px; height: 52px;
+            border-color: #F7E100;
+            background: rgba(247,225,0,0.08);
+        }
+        #cursor-ring.hover-drag {
+            width: 44px; height: 44px;
+            border-color: #22FFA6;
+            background: rgba(34,255,166,0.12);
+        }
+        @media (pointer: coarse) {
+            #cursor-dot, #cursor-ring { display: none; }
+        }
+
+        /* ---------- Scroll reveal ---------- */
+        .reveal {
+            opacity: 0;
+            transform: translateY(28px);
+            transition: opacity 0.7s cubic-bezier(.22,1,.36,1), transform 0.7s cubic-bezier(.22,1,.36,1);
+        }
+        .reveal.in-view { opacity: 1; transform: none; }
+
+        /* ---------- Skill bar fill-on-scroll ---------- */
+        .skill-bar-fill { width: 0 !important; transition: width 1.2s cubic-bezier(.22,1,.36,1); }
+        .skill-bar-fill.filled { width: var(--target-width) !important; }
+
+        /* ---------- Click-burst sparks ---------- */
+        .spark {
+            position: fixed;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 9998;
+            animation: spark-pop 0.7s ease-out forwards;
+        }
+        @keyframes spark-pop {
+            0% { opacity: 1; transform: translate(0, 0) scale(1); }
+            100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.2); }
+        }
+
+        /* ---------- Button pulse ---------- */
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(34,255,166,0.5); }
+            50% { box-shadow: 0 0 0 10px rgba(34,255,166,0); }
+        }
+        .pulse-btn { animation: pulse-glow 2.2s ease-out infinite; }
+
+        /* ---------- Flip cards (projects) ---------- */
+        .flip-card { perspective: 1800px; min-height: 22rem; cursor: pointer; }
+        .flip-inner {
+            position: relative;
+            width: 100%; height: 100%;
+            min-height: 22rem;
+            transition: transform 0.85s cubic-bezier(.45,0,.2,1), box-shadow 0.5s ease;
+            transform-style: preserve-3d;
+            will-change: transform;
+        }
+        .flip-card:not(.flipped):hover .flip-inner {
+            transform: rotateY(-8deg) scale(1.015);
+            box-shadow: 0 18px 40px -12px rgba(0,229,255,0.35);
+        }
+        .flip-card.flipped .flip-inner { transform: rotateY(180deg); }
+        .flip-front, .flip-back {
+            position: absolute; inset: 0;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            display: flex; flex-direction: column;
+            transition: opacity 0.4s ease 0.15s;
+        }
+        .flip-back {
+            transform: rotateY(180deg);
+            justify-content: space-between;
+            padding: 1.5rem;
+        }
+        /* fade each face out as it swings out of view, in as it swings into view */
+        .flip-card:not(.flipped) .flip-back,
+        .flip-card.flipped .flip-front { opacity: 0; transition-delay: 0s; }
+
+        /* ---------- Neon glow headings ---------- */
+        @keyframes neon-flicker {
+            0%, 100% { text-shadow: 0 0 6px currentColor, 0 0 18px currentColor, 0 0 34px rgba(0,229,255,0.5); }
+            50% { text-shadow: 0 0 3px currentColor, 0 0 10px currentColor, 0 0 20px rgba(0,229,255,0.3); }
+        }
+        .neon-text { animation: neon-flicker 2.6s ease-in-out infinite; }
+
+        /* ---------- Aurora blobs behind hero ---------- */
+        .aurora-blob {
+            position: absolute;
+            border-radius: 9999px;
+            filter: blur(80px);
+            opacity: 0.35;
+            mix-blend-mode: screen;
+            animation: float-blob 14s ease-in-out infinite;
+        }
+        @keyframes float-blob {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(40px, -30px) scale(1.15); }
+            66% { transform: translate(-30px, 25px) scale(0.9); }
+        }
+
+        /* ---------- GPAX counter ring ---------- */
+        .gpax-ring-bg { stroke: rgba(255,255,255,0.08); }
+        .gpax-ring-fill {
+            stroke: #F7E100;
+            stroke-linecap: round;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+            transition: stroke-dashoffset 1.6s cubic-bezier(.22,1,.36,1);
+        }
+
+        /* ---------- Twinkling stars (preloader) ---------- */
+        .star {
+            position: absolute;
+            border-radius: 50%;
+            background: white;
+            animation: twinkle 2.4s ease-in-out infinite;
+        }
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.15; transform: scale(0.8); }
+            50% { opacity: 1; transform: scale(1.2); }
+        }
+
+        /* ---------- Atom loader ---------- */
+        .atom-loader { position: relative; width: 96px; height: 96px; }
+        .atom-nucleus {
+            position: absolute; inset: 0; margin: auto;
+            width: 16px; height: 16px; border-radius: 50%;
+            background: radial-gradient(circle, #ffffff, #00E5FF);
+            box-shadow: 0 0 16px 5px rgba(0,229,255,0.7);
+        }
+        .orbit {
+            position: absolute; inset: 0;
+            border: 1.5px solid rgba(255,255,255,0.25);
+            border-radius: 50%;
+        }
+        .orbit .electron {
+            position: absolute; top: -4px; left: 50%;
+            width: 9px; height: 9px; margin-left: -4.5px;
+            border-radius: 50%;
+            box-shadow: 0 0 10px 3px currentColor;
+        }
+        .orbit-1 { animation: spin1 2.2s linear infinite; }
+        @keyframes spin1 {
+            from { transform: rotateX(70deg) rotateZ(0deg) rotateY(0deg); }
+            to   { transform: rotateX(70deg) rotateZ(0deg) rotateY(360deg); }
+        }
+        .orbit-2 { animation: spin2 2.7s linear infinite; }
+        @keyframes spin2 {
+            from { transform: rotateX(70deg) rotateZ(60deg) rotateY(0deg); }
+            to   { transform: rotateX(70deg) rotateZ(60deg) rotateY(-360deg); }
+        }
+        .orbit-3 { animation: spin3 3.2s linear infinite; }
+        @keyframes spin3 {
+            from { transform: rotateX(70deg) rotateZ(120deg) rotateY(0deg); }
+            to   { transform: rotateX(70deg) rotateZ(120deg) rotateY(360deg); }
+        }
+
+        /* ---------- Gradient section headings ---------- */
+        .gradient-text {
+            background: linear-gradient(90deg, #22FFA6, #00E5FF, #9D6BFF);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            background-size: 200% auto;
+            animation: gradient-shift 6s ease-in-out infinite;
+        }
+        @keyframes gradient-shift {
+            0%, 100% { background-position: 0% center; }
+            50% { background-position: 100% center; }
+        }
+
+        /* ---------- DNA helix (biology decoration) ---------- */
+        .dna-helix { position: relative; width: 60px; height: 220px; }
+        .dna-rung { position: absolute; left: 50%; width: 46px; height: 2px; background: rgba(255,255,255,0.15); transform: translateX(-50%); transform-origin: center; }
+        .dna-dot { position: absolute; width: 10px; height: 10px; border-radius: 50%; margin-left: -5px; animation: dna-sway 3.4s ease-in-out infinite; }
+        .dna-dot.right { animation-delay: -1.7s; }
+        @keyframes dna-sway {
+            0%, 100% { transform: translateX(-18px) scale(1); opacity: 1; }
+            50% { transform: translateX(18px) scale(0.7); opacity: 0.55; }
+        }
+
+        /* ---------- Mini orbiting solar system (astronomy decoration) ---------- */
+        .mini-solar { position: relative; width: 120px; height: 120px; }
+        .mini-sun {
+            position: absolute; inset: 0; margin: auto;
+            width: 20px; height: 20px; border-radius: 50%;
+            background: radial-gradient(circle, #fff, #F7E100);
+            box-shadow: 0 0 20px 6px rgba(247,225,0,0.6);
+        }
+        .mini-orbit-path { position: absolute; border: 1px dashed rgba(255,255,255,0.15); border-radius: 50%; top: 50%; left: 50%; transform: translate(-50%,-50%); }
+        .mini-planet { position: absolute; border-radius: 50%; top: 0; left: 50%; }
+        @keyframes orbit-rotate { from { transform: translate(-50%,-50%) rotate(0deg); } to { transform: translate(-50%,-50%) rotate(360deg); } }
+
+        /* ---------- Shooting stars ---------- */
+        .shooting-star {
+            position: fixed;
+            top: 0; left: 0;
+            width: 3px; height: 3px;
+            border-radius: 50%;
+            background: white;
+            box-shadow: 0 0 6px 2px rgba(255,255,255,0.8);
+            pointer-events: none;
+            z-index: 5;
+            animation: shoot 1.4s linear forwards;
+        }
+        .shooting-star::after {
+            content: '';
+            position: absolute;
+            top: 50%; right: 0;
+            width: 90px; height: 1px;
+            background: linear-gradient(to left, rgba(255,255,255,0.9), transparent);
+            transform: translateY(-50%);
+        }
+        @keyframes shoot {
+            from { transform: translate(0, 0); opacity: 1; }
+            to { transform: translate(-420px, 420px); opacity: 0; }
+        }
+
+        /* ---------- Magnetic buttons (physics feel) ---------- */
+        .magnetic { transition: transform 0.15s ease-out; }
+
+        /* ---------- Rainbow gradient border (spec card) ---------- */
+        .rainbow-border {
+            position: relative;
+            border: 2px solid transparent;
+            background:
+                linear-gradient(#080B1F, #080B1F) padding-box,
+                linear-gradient(120deg, #22FFA6, #00E5FF, #9D6BFF, #FF2E92, #F7E100, #22FFA6) border-box;
+            background-size: 100% 100%, 300% 300%;
+            animation: rainbow-spin 8s linear infinite;
+        }
+        @keyframes rainbow-spin {
+            0% { background-position: 0% 0%, 0% 50%; }
+            100% { background-position: 0% 0%, 300% 50%; }
+        }
+
+        /* ---------- Pendulum (physics decoration) ---------- */
+        .pendulum-box { position: relative; width: 100%; height: 90px; }
+        .pendulum-arm {
+            position: absolute; top: 0; left: 50%;
+            width: 2px; height: 64px;
+            background: linear-gradient(to bottom, rgba(0,229,255,0.5), rgba(0,229,255,0.1));
+            transform-origin: top center;
+            animation: pendulum-swing 1.8s ease-in-out infinite;
+        }
+        .pendulum-bob {
+            position: absolute; bottom: -9px; left: 50%; margin-left: -9px;
+            width: 18px; height: 18px; border-radius: 50%;
+            background: radial-gradient(circle at 35% 30%, #fff, #00E5FF 60%, #0891a8);
+            box-shadow: 0 0 12px 3px rgba(0,229,255,0.6);
+        }
+        @keyframes pendulum-swing {
+            0%, 100% { transform: rotate(-28deg); }
+            50% { transform: rotate(28deg); }
+        }
+
+        /* ---------- Orbiting electron ring (physics accent icon) ---------- */
+        .physics-orbit-mini { position: relative; width: 34px; height: 34px; }
+        .physics-orbit-mini .ring {
+            position: absolute; inset: 0;
+            border: 1px solid rgba(0,229,255,0.5);
+            border-radius: 50%;
+        }
+        .physics-orbit-mini .ring:nth-child(1) { transform: rotate(0deg); animation: orbit-rotate 2.4s linear infinite; }
+        .physics-orbit-mini .ring:nth-child(2) { transform: rotate(60deg); animation: orbit-rotate 3s linear infinite reverse; }
+        .physics-orbit-mini .ring .dot {
+            position: absolute; top: -2px; left: 50%; margin-left: -2px;
+            width: 4px; height: 4px; border-radius: 50%;
+            background: #F7E100; box-shadow: 0 0 6px 2px rgba(247,225,0,0.7);
+        }
+
+        /* ---------- Mitosis / dividing cell (biology decoration) ---------- */
+        .cell-mitosis { position: relative; width: 44px; height: 28px; }
+        .cell-mitosis .cell {
+            position: absolute; top: 50%; left: 50%;
+            width: 20px; height: 20px; border-radius: 50%;
+            background: radial-gradient(circle at 35% 30%, rgba(34,255,166,0.9), rgba(34,255,166,0.15) 70%);
+            border: 1px solid rgba(34,255,166,0.6);
+            animation: mitosis-split 3.2s ease-in-out infinite;
+        }
+        .cell-mitosis .cell.b { animation-name: mitosis-split-b; }
+        .cell-mitosis .nucleus {
+            position: absolute; top: 50%; left: 50%; width: 7px; height: 7px;
+            margin: -3.5px 0 0 -3.5px; border-radius: 50%;
+            background: #22FFA6;
+        }
+        @keyframes mitosis-split {
+            0%, 15% { transform: translate(-50%,-50%) scale(1); }
+            50% { transform: translate(-130%,-50%) scale(0.8); }
+            85%, 100% { transform: translate(-130%,-50%) scale(0.8); }
+        }
+        @keyframes mitosis-split-b {
+            0%, 15% { transform: translate(-50%,-50%) scale(1); opacity: 0; }
+            16% { opacity: 1; }
+            50% { transform: translate(30%,-50%) scale(0.8); }
+            85%, 100% { transform: translate(30%,-50%) scale(0.8); }
+        }
+
+        /* ---------- Comet trail (astronomy decoration) ---------- */
+        .comet-track { position: relative; width: 100%; height: 26px; overflow: hidden; }
+        .comet {
+            position: absolute; top: 50%; left: -10%;
+            width: 8px; height: 8px; margin-top: -4px; border-radius: 50%;
+            background: #F7E100; box-shadow: 0 0 10px 3px rgba(247,225,0,0.8);
+            animation: comet-fly 3.6s linear infinite;
+        }
+        .comet::after {
+            content: '';
+            position: absolute; top: 50%; right: 100%;
+            width: 50px; height: 2px;
+            background: linear-gradient(to left, rgba(247,225,0,0.8), transparent);
+            transform: translateY(-50%);
+        }
+        @keyframes comet-fly {
+            from { left: -10%; }
+            to { left: 110%; }
+        }
+
+        /* ---------- Thin continuous meteor-shower background (About / Skills) ---------- */
+        .meteor-shower {
+            position: absolute;
+            inset: 0;
+            overflow: hidden;
+            pointer-events: none;
+            z-index: 0;
+        }
+        .meteor-shower .meteor {
+            position: absolute;
+            top: var(--mt, 0%);
+            left: var(--ml, 0%);
+            width: 2px; height: 2px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.85);
+            opacity: 0;
+            animation-name: meteor-fall;
+            animation-timing-function: linear;
+            animation-iteration-count: infinite;
+            animation-duration: var(--md, 4s);
+            animation-delay: var(--mdelay, 0s);
+        }
+        .meteor-shower .meteor::before {
+            content: '';
+            position: absolute;
+            top: 50%; right: 0;
+            width: 70px; height: 1px;
+            background: linear-gradient(to left, rgba(255,255,255,0.55), transparent);
+            transform: translateY(-50%) rotate(-32deg);
+            transform-origin: right center;
+        }
+        @keyframes meteor-fall {
+            0%   { transform: translate(0, 0); opacity: 0; }
+            8%   { opacity: 0.45; }
+            75%  { opacity: 0.3; }
+            100% { transform: translate(-32vw, 42vh); opacity: 0; }
+        }
+
+        /* ---------- EKG / heartbeat pulse line (biology decoration) ---------- */
+        .heartbeat-pulse path {
+            fill: none;
+            stroke: #22FFA6;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            stroke-dasharray: 260;
+            stroke-dashoffset: 260;
+            filter: drop-shadow(0 0 4px rgba(34,255,166,0.55));
+            animation: pulse-draw 2.6s ease-in-out infinite;
+        }
+        @keyframes pulse-draw {
+            0%   { stroke-dashoffset: 260; }
+            50%  { stroke-dashoffset: 0; }
+            100% { stroke-dashoffset: -260; }
+        }
+
+        /* ---------- Floating microbe bubbles (biology decoration) ---------- */
+        .micro-dot {
+            position: absolute;
+            border-radius: 50%;
+            background: #22FFA6;
+            opacity: 0.3;
+            animation: bubble-float 4s ease-in-out infinite;
+            pointer-events: none;
+        }
+        @keyframes bubble-float {
+            0%, 100% { transform: translateY(0); opacity: 0.15; }
+            50% { transform: translateY(-10px); opacity: 0.45; }
+        }
+
+        /* ---------- Academic skills card: extra flair ---------- */
+        .academic-card {
+            transition: box-shadow 0.4s ease, transform 0.3s ease;
+        }
+        .academic-card:hover {
+            box-shadow: 0 0 0 1px rgba(34,255,166,0.45), 0 0 40px -6px rgba(34,255,166,0.4);
+        }
+        .academic-card:hover .flask-bubble { animation-duration: 1.1s; }
+        .academic-card:hover .subject-icon-spin { animation-play-state: running; }
+        .subject-row { transition: transform 0.25s ease; }
+        .subject-row:hover { transform: translateX(4px); }
+        .subject-row:hover .subject-pct { text-shadow: 0 0 10px currentColor; }
+        .subject-pct { transition: text-shadow 0.25s ease; font-variant-numeric: tabular-nums; }
+
+        /* small bubbling flask icon */
+        .flask-icon { position: relative; width: 26px; height: 30px; }
+        .flask-icon svg { width: 100%; height: 100%; display: block; }
+        .flask-bubble {
+            position: absolute;
+            bottom: 6px;
+            border-radius: 50%;
+            background: currentColor;
+            opacity: 0.9;
+            animation: flask-rise 1.8s ease-in infinite;
+        }
+        @keyframes flask-rise {
+            0%   { transform: translateY(0) scale(1); opacity: 0.9; }
+            80%  { opacity: 0.5; }
+            100% { transform: translateY(-14px) scale(0.4); opacity: 0; }
+        }
+
+        /* gently spinning atom badge next to the "ด้านวิชาการ" heading */
+        .subject-icon-spin {
+            display: inline-block;
+            animation: subject-wobble 2.4s ease-in-out infinite;
+            animation-play-state: paused;
+            transform-origin: 50% 60%;
+        }
+        @keyframes subject-wobble {
+            0%, 100% { transform: rotate(-8deg) scale(1); }
+            50% { transform: rotate(8deg) scale(1.15); }
+        }
+    </style>
 </head>
-<body class="bg-slate-900 text-slate-100 font-sans antialiased selection:bg-safety selection:text-white">
+<body class="bg-blueprint text-slate-100 font-sans antialiased">
+
+    <!-- ==================== PRELOADER ==================== -->
+    <div id="preloader" class="fixed inset-0 z-[100000] bg-blueprint flex flex-col items-center justify-center gap-6 overflow-hidden" style="transition: opacity 0.7s ease;">
+        <div class="star" style="width:2px;height:2px;top:12%;left:18%;animation-delay:-0.4s;"></div>
+        <div class="star" style="width:3px;height:3px;top:22%;left:78%;animation-delay:-1.1s;"></div>
+        <div class="star" style="width:2px;height:2px;top:68%;left:12%;animation-delay:-0.7s;"></div>
+        <div class="star" style="width:3px;height:3px;top:80%;left:82%;animation-delay:-1.6s;"></div>
+        <div class="star" style="width:2px;height:2px;top:35%;left:50%;animation-delay:-0.2s;"></div>
+        <div class="star" style="width:2px;height:2px;top:85%;left:45%;animation-delay:-1.9s;"></div>
+        <div class="star" style="width:3px;height:3px;top:15%;left:60%;animation-delay:-0.9s;"></div>
+        <div class="star" style="width:2px;height:2px;top:55%;left:88%;animation-delay:-1.3s;"></div>
+
+        <div class="atom-loader">
+            <div class="atom-nucleus"></div>
+            <div class="orbit orbit-1"><span class="electron" style="background:#22FFA6; color:#22FFA6;"></span></div>
+            <div class="orbit orbit-2"><span class="electron" style="background:#FF5A00; color:#FF5A00;"></span></div>
+            <div class="orbit orbit-3"><span class="electron" style="background:#9D6BFF; color:#9D6BFF;"></span></div>
+        </div>
+
+        <div class="font-display text-white text-xs sm:text-sm tracking-[0.3em] uppercase text-center px-6">
+            กำลังจัดเตรียมข้อมูลนักวิทยาศาสตร์รุ่นเยาว์
+        </div>
+        <div class="w-64 max-w-[70vw] h-2.5 bg-blueprint-light rounded-full overflow-hidden border border-hivis-cyan/20">
+            <div id="preloader-bar" class="h-full bg-gradient-to-r from-hivis-green via-hivis-cyan to-hivis-violet rounded-full" style="width:0%; transition: width 0.15s ease-out;"></div>
+        </div>
+        <div id="preloader-percent" class="font-display text-hivis-cyan text-4xl font-bold tabular-nums">0%</div>
+    </div>
+    <script>
+        (function () {
+            const preloader = document.getElementById('preloader');
+            const bar = document.getElementById('preloader-bar');
+            const percentEl = document.getElementById('preloader-percent');
+            document.body.style.overflow = 'hidden';
+
+            let progress = 0;
+            const simInterval = setInterval(() => {
+                progress = Math.min(progress + Math.random() * 8 + 2, 85);
+                bar.style.width = progress + '%';
+                percentEl.textContent = Math.floor(progress) + '%';
+                if (progress >= 85) clearInterval(simInterval);
+            }, 120);
+
+            let finished = false;
+            function finishLoading() {
+                if (finished) return;
+                finished = true;
+                clearInterval(simInterval);
+                bar.style.width = '100%';
+                percentEl.textContent = '100%';
+                setTimeout(() => {
+                    preloader.style.opacity = '0';
+                    preloader.style.pointerEvents = 'none';
+                    document.body.style.overflow = '';
+                    setTimeout(() => preloader.remove(), 700);
+                }, 350);
+            }
+
+            if (document.readyState === 'complete') {
+                setTimeout(finishLoading, 600);
+            } else {
+                window.addEventListener('load', () => setTimeout(finishLoading, 400));
+            }
+            setTimeout(finishLoading, 4000);
+        })();
+    </script>
+
+    <!-- Custom animated cursor -->
+    <div id="cursor-ring">🔬</div>
+    <div id="cursor-dot"></div>
 
     <!-- ==================== HEADER & NAVIGATION ==================== -->
-    <header class="fixed top-0 left-0 w-full z-50 bg-blueprint/90 backdrop-blur-md border-b border-slate-800">
+    <header class="fixed top-0 left-0 w-full z-50 bg-blueprint/90 backdrop-blur-md border-b border-hivis-cyan/20">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-16">
-                <!-- Logo / Monogram -->
-                <a href="#" class="flex items-center gap-2 text-xl font-bold tracking-wider text-white">
-                    <span class="p-1.5 bg-safety rounded text-slate-900 font-extrabold">
-                        KP
-                    </span>
-                    <span>กลวัชร.<span class="text-safety">CIVIL</span></span>
+                <a href="#" class="flex items-center gap-2 text-xl font-bold tracking-wider text-white font-display">
+                    <span class="p-1.5 bg-hivis-cyan rounded text-blueprint font-extrabold">KP</span>
+                    <span>กลวัชร.<span class="text-hivis-green">SCIENCE</span></span>
                 </a>
 
-                <!-- Desktop Navigation -->
                 <nav class="hidden md:flex space-x-8 text-sm font-medium">
-                    <a href="#hero" class="hover:text-safety transition-colors">หน้าแรก</a>
-                    <a href="#about" class="hover:text-safety transition-colors">เกี่ยวกับผม</a>
-                    <a href="#skills" class="hover:text-safety transition-colors">ทักษะ</a>
-                    <a href="#projects" class="hover:text-safety transition-colors">ผลงาน & กิจกรรม</a>
-                    <a href="#contact" class="hover:text-safety transition-colors">ติดต่อ</a>
+                    <a href="#hero" class="hover:text-hivis-cyan transition-colors">หน้าแรก</a>
+                    <a href="#about" class="hover:text-hivis-cyan transition-colors">เกี่ยวกับผม</a>
+                    <a href="#skills" class="hover:text-hivis-cyan transition-colors">ทักษะ</a>
+                    <a href="#projects" class="hover:text-hivis-cyan transition-colors">ผลงาน & กิจกรรม</a>
+                    <a href="#contact" class="hover:text-hivis-cyan transition-colors">ติดต่อ</a>
                 </nav>
 
-                <!-- Mobile Menu Button -->
                 <div class="md:hidden">
                     <button id="mobile-menu-btn" type="button" class="text-slate-300 hover:text-white focus:outline-none p-2">
                         <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -75,40 +626,52 @@
             </div>
         </div>
 
-        <!-- Mobile Navigation Menu -->
-        <div id="mobile-menu" class="hidden md:hidden bg-blueprint-card border-b border-slate-700 px-4 pt-2 pb-4 space-y-2">
-            <a href="#hero" class="mobile-link block px-3 py-2 rounded-md text-base font-medium hover:bg-slate-700">หน้าแรก</a>
-            <a href="#about" class="mobile-link block px-3 py-2 rounded-md text-base font-medium hover:bg-slate-700">เกี่ยวกับผม</a>
-            <a href="#skills" class="mobile-link block px-3 py-2 rounded-md text-base font-medium hover:bg-slate-700">ทักษะ</a>
-            <a href="#projects" class="mobile-link block px-3 py-2 rounded-md text-base font-medium hover:bg-slate-700">ผลงาน & กิจกรรม</a>
-            <a href="#contact" class="mobile-link block px-3 py-2 rounded-md text-base font-medium hover:bg-slate-700">ติดต่อ</a>
+        <div id="mobile-menu" class="hidden md:hidden bg-blueprint-card border-b border-hivis-cyan/20 px-4 pt-2 pb-4 space-y-2">
+            <a href="#hero" class="mobile-link block px-3 py-2 rounded-md text-base font-medium hover:bg-blueprint-light">หน้าแรก</a>
+            <a href="#about" class="mobile-link block px-3 py-2 rounded-md text-base font-medium hover:bg-blueprint-light">เกี่ยวกับผม</a>
+            <a href="#skills" class="mobile-link block px-3 py-2 rounded-md text-base font-medium hover:bg-blueprint-light">ทักษะ</a>
+            <a href="#projects" class="mobile-link block px-3 py-2 rounded-md text-base font-medium hover:bg-blueprint-light">ผลงาน & กิจกรรม</a>
+            <a href="#contact" class="mobile-link block px-3 py-2 rounded-md text-base font-medium hover:bg-blueprint-light">ติดต่อ</a>
         </div>
     </header>
 
 
     <!-- ==================== HERO SECTION ==================== -->
-    <section id="hero" class="min-h-screen flex items-center justify-center pt-16 relative overflow-hidden bg-gradient-to-b from-slate-900 via-blueprint to-slate-900">
-        <!-- Background Grid Pattern -->
-        <div class="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] opacity-40"></div>
+    <section id="hero" class="min-h-screen flex items-center justify-center pt-16 relative overflow-hidden">
+        <div class="aurora-blob w-96 h-96 bg-hivis-green top-[10%] left-[8%]"></div>
+        <div class="aurora-blob w-[28rem] h-[28rem] bg-hivis-cyan top-[40%] right-[5%]" style="animation-delay: -5s;"></div>
+        <div class="aurora-blob w-80 h-80 bg-hivis-violet bottom-[5%] left-[30%]" style="animation-delay: -9s;"></div>
+        <div id="parallax-grid" class="parallax-layer grid-bg absolute -inset-20 opacity-70 [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_60%,transparent_100%)]"></div>
+
+        <div id="parallax-icons" class="absolute inset-0 pointer-events-none">
+            <span class="parallax-layer absolute text-5xl opacity-30 top-[18%] left-[12%]" data-depth="40">🔬</span>
+            <span class="parallax-layer absolute text-6xl opacity-25 top-[65%] left-[15%]" data-depth="70">🧬</span>
+            <span class="parallax-layer absolute text-5xl opacity-25 top-[25%] right-[10%]" data-depth="55">🔭</span>
+            <span class="parallax-layer absolute text-6xl opacity-20 top-[70%] right-[14%]" data-depth="30">⚗️</span>
+            <span class="parallax-layer absolute text-4xl opacity-30 top-[45%] left-[6%]" data-depth="90">🌌</span>
+        </div>
 
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center relative z-10">
-            <span class="inline-block py-1 px-3 rounded-full bg-slate-800 text-safety text-xs font-semibold tracking-wider uppercase mb-4 border border-slate-700">
-                PORTFOLIO ยื่นสมัครเข้าเรียนต่อ ม.4
+            <span class="inline-block py-1 px-3 rounded-full bg-blueprint-card text-hivis-yellow text-xs font-semibold tracking-wide mb-4 border border-hivis-yellow/30">
+                Portfolio ยื่นสมัครเข้าเรียนต่อ ม.4
             </span>
-            <h1 class="text-4xl sm:text-6xl font-extrabold tracking-tight text-white mb-2">
-                ด.ช.กลวัชร โพธิวัฒนานนท์
+
+            <h1 class="font-display text-4xl sm:text-6xl font-extrabold tracking-tight text-white mb-2 select-none" id="drag-title">
+                <!-- letters injected by JS -->
             </h1>
-            <h2 class="text-2xl sm:text-3xl font-bold text-safety mb-6">
-                ว่าที่นักเรียนเตรียมวิศวกรรมโยธา
+            <p class="text-xs text-concrete mb-6">(ลองลากตัวอักษรด้านบนเล่นดูได้นะ 👆)</p>
+
+            <h2 class="neon-text text-2xl sm:text-3xl font-bold text-hivis-cyan mb-6 font-display">
+                ว่าที่นักวิทยาศาสตร์รุ่นใหม่
             </h2>
             <p class="text-lg sm:text-xl text-concrete-light max-w-2xl mx-auto mb-8 font-light leading-relaxed">
-                "Building the Future | มุ่งมั่นสร้างสรรค์โครงสร้าง ยืนหยัดบนความมั่นคง"
+                "Explore the Universe | ตั้งคำถาม ค้นหาคำตอบ ค้นพบความจริงของธรรมชาติ"
             </p>
             <div class="flex flex-col sm:flex-row justify-center gap-4">
-                <a href="#projects" class="bg-safety hover:bg-safety-hover text-white px-8 py-3.5 rounded-lg font-medium transition-all shadow-lg shadow-orange-500/20 text-center">
+                <a href="#projects" class="pulse-btn bg-hivis-green hover:brightness-110 text-blueprint px-8 py-3.5 rounded-lg font-bold transition-all shadow-lg shadow-green-400/30 text-center">
                     ดูผลงานของผม
                 </a>
-                <a href="#about" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-8 py-3.5 rounded-lg font-medium transition-all text-center">
+                <a href="#about" class="bg-blueprint-card hover:bg-blueprint-light text-slate-200 border border-hivis-cyan/40 px-8 py-3.5 rounded-lg font-medium transition-all text-center">
                     ทำความรู้จักเพิ่มเติม
                 </a>
             </div>
@@ -117,72 +680,129 @@
 
 
     <!-- ==================== ABOUT ME SECTION ==================== -->
-    <section id="about" class="py-20 bg-blueprint-card border-y border-slate-800">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section id="about" class="py-20 bg-blueprint-card border-y border-hivis-cyan/10 relative overflow-hidden">
+        <div class="aurora-blob w-72 h-72 bg-hivis-green top-[-10%] left-[-5%]" style="opacity:0.22;"></div>
+        <div class="aurora-blob w-80 h-80 bg-hivis-violet bottom-[-15%] right-[-5%]" style="opacity:0.2; animation-delay:-6s;"></div>
+        <div class="star" style="width:2px;height:2px;top:15%;left:85%;animation-delay:-0.3s;"></div>
+        <div class="star" style="width:2px;height:2px;top:75%;left:8%;animation-delay:-1.2s;"></div>
+        <div class="star" style="width:3px;height:3px;top:40%;left:92%;animation-delay:-0.8s;"></div>
+        <div class="meteor-shower" aria-hidden="true">
+            <span class="meteor" style="--mt:5%; --ml:15%; --md:3.8s; --mdelay:0s;"></span>
+            <span class="meteor" style="--mt:0%; --ml:45%; --md:4.6s; --mdelay:-1.2s;"></span>
+            <span class="meteor" style="--mt:10%; --ml:70%; --md:5.2s; --mdelay:-2.6s;"></span>
+            <span class="meteor" style="--mt:2%; --ml:85%; --md:4.1s; --mdelay:-0.6s;"></span>
+            <span class="meteor" style="--mt:20%; --ml:30%; --md:5.8s; --mdelay:-3.4s;"></span>
+            <span class="meteor" style="--mt:0%; --ml:60%; --md:4.4s; --mdelay:-2s;"></span>
+        </div>
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-                
-                <!-- กรอบใส่รูปภาพประจำตัว (Profile Image Frame) -->
-                <div class="flex justify-center">
-                    <div class="w-full max-w-md bg-slate-900 border-2 border-slate-700 rounded-2xl p-4 relative overflow-hidden group shadow-xl">
-                        <div class="absolute top-0 right-0 bg-safety text-slate-900 text-xs font-bold px-3 py-1 rounded-bl-lg uppercase tracking-wider z-20">
-                            CIVIL SPEC
-                        </div>
-                        
-                        <!-- ช่องใส่รูปโปรไฟล์ -->
-                        <div class="relative w-full aspect-[3/4] rounded-xl overflow-hidden bg-slate-800 border border-slate-700 mb-4">
-                            <!-- ใส่ URL รูปภาพประจำตัวของคุณใน attribute src ข้างล่างนี้ -->
-                            <img src="https://via.placeholder.com/600x800?text=Your+Profile+Image" 
-                                 alt="กลวัชร โพธิวัฒนานนท์" 
-                                 class="w-full h-full object-cover object-center group-hover:scale-105 transition duration-500">
-                        </div>
 
-                        <!-- Card Metadata Details -->
-                        <div class="space-y-2 font-mono text-xs px-2">
-                            <div class="flex justify-between py-1 border-b border-slate-800">
-                                <span class="text-concrete">TARGET:</span>
-                                <span class="text-white">เตรียมวิศวกรรมโยธา ม.4</span>
+                <div class="flex justify-center reveal">
+                    <div class="rainbow-border w-full max-w-md rounded-2xl p-8 relative overflow-hidden">
+                        <div class="absolute top-0 right-0 bg-gradient-to-r from-hivis-cyan to-hivis-violet text-blueprint text-xs font-bold px-3 py-1 rounded-bl-lg tracking-wide">
+                            SCIENCE SPEC
+                        </div>
+                        <div class="space-y-6">
+                            <div class="flex items-center gap-4 border-b border-hivis-cyan/20 pb-4">
+                                <!-- ==== รูปผู้จัดทำ: แก้ src ของ <img> ด้านล่างเป็นลิงก์รูปจริงของคุณ ==== -->
+                                <div class="relative w-20 h-20 shrink-0 rounded-xl overflow-hidden border border-hivis-cyan/40 bg-gradient-to-br from-hivis-cyan/20 via-hivis-violet/20 to-hivis-pink/20 shadow-[0_0_18px_-3px_rgba(0,229,255,0.5)]">
+                                    <img
+                                        src="IMG/myself2.jpg"
+                                        alt="รูปผู้จัดทำ - ด.ช.กลวัชร โพธิวัฒนานนท์"
+                                        class="w-full h-full object-cover"
+                                        onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                                    >
+                                    <!-- corner scan brackets -->
+                                    <span class="absolute top-1 left-1 w-2.5 h-2.5 border-t border-l border-hivis-cyan/70"></span>
+                                    <span class="absolute top-1 right-1 w-2.5 h-2.5 border-t border-r border-hivis-cyan/70"></span>
+                                    <span class="absolute bottom-1 left-1 w-2.5 h-2.5 border-b border-l border-hivis-cyan/70"></span>
+                                    <span class="absolute bottom-1 right-1 w-2.5 h-2.5 border-b border-r border-hivis-cyan/70"></span>
+                                </div>
+                                <div>
+                                    <h3 class="text-xl font-bold text-white">กลวัชร โพธิวัฒนานนท์</h3>
+                                    <p class="text-xs text-concrete-light">นักเรียนชั้นมัธยมศึกษาปีที่ 3</p>
+                                </div>
                             </div>
-                            <div class="flex justify-between py-1 border-b border-slate-800">
-                                <span class="text-concrete">GPAX:</span>
-                                <span class="text-safety font-bold">3.98</span>
+
+                            <div class="space-y-3 font-mono text-sm">
+                                <div class="flex justify-between py-1 border-b border-hivis-cyan/10">
+                                    <span class="text-hivis-cyan">TARGET:</span>
+                                    <span class="text-white">แผนการเรียนวิทยาศาสตร์ ม.4</span>
+                                </div>
+                                <div class="flex justify-between py-1 border-b border-hivis-cyan/10">
+                                    <span class="text-hivis-yellow">GPAX:</span>
+                                    <span class="text-hivis-yellow font-bold text-base">3.98</span>
+                                </div>
+                                <div class="flex justify-between items-center py-1 border-b border-hivis-cyan/10">
+                                    <span class="text-hivis-pink">FOCUS:</span>
+                                    <span class="text-white text-right">
+                                        <span class="text-hivis-green">Biology</span> · <span class="text-hivis-orange">Chemistry</span> · <span class="text-hivis-cyan">Physics</span> · <span class="text-hivis-violet">Astronomy</span>
+                                    </span>
+                                </div>
+                                <div class="flex justify-between py-1">
+                                    <span class="text-hivis-green">STATUS:</span>
+                                    <span class="text-hivis-green">Ready for Admission</span>
+                                </div>
                             </div>
-                            <div class="flex justify-between py-1">
-                                <span class="text-concrete">STATUS:</span>
-                                <span class="text-emerald-400">Ready for Admission</span>
+
+                            <div class="comet-track" aria-hidden="true"><span class="comet"></span></div>
+
+                            <div class="pt-2 text-center">
+                                <span class="inline-block px-4 py-2 bg-blueprint-light rounded-lg text-xs text-slate-300 border border-hivis-cyan/20">
+                                    🧬 Future Scientist Candidate
+                                </span>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Text Content -->
-                <div class="space-y-6">
-                    <div class="inline-flex items-center gap-2 text-safety font-medium text-sm">
-                        <span class="w-2 h-2 rounded-full bg-safety"></span>
-                        ABOUT ME
+                <div class="space-y-6 reveal relative">
+                    <div class="hidden lg:block absolute -right-6 top-0 opacity-80" id="dna-helix-mount" aria-hidden="true">
+                        <div class="dna-helix">
+                            <div class="dna-rung" style="top:0px;"><span class="dna-dot" style="background:#22FFA6;box-shadow:0 0 6px 2px rgba(34,255,166,0.6);"></span><span class="dna-dot right" style="background:#00E5FF;box-shadow:0 0 6px 2px rgba(0,229,255,0.6);"></span></div>
+                            <div class="dna-rung" style="top:20px;"><span class="dna-dot" style="background:#9D6BFF;box-shadow:0 0 6px 2px rgba(157,107,255,0.6);"></span><span class="dna-dot right" style="background:#F7E100;box-shadow:0 0 6px 2px rgba(247,225,0,0.6);"></span></div>
+                            <div class="dna-rung" style="top:40px;"><span class="dna-dot" style="background:#FF2E92;box-shadow:0 0 6px 2px rgba(255,46,146,0.6);"></span><span class="dna-dot right" style="background:#22FFA6;box-shadow:0 0 6px 2px rgba(34,255,166,0.6);"></span></div>
+                            <div class="dna-rung" style="top:60px;"><span class="dna-dot" style="background:#00E5FF;box-shadow:0 0 6px 2px rgba(0,229,255,0.6);"></span><span class="dna-dot right" style="background:#9D6BFF;box-shadow:0 0 6px 2px rgba(157,107,255,0.6);"></span></div>
+                            <div class="dna-rung" style="top:80px;"><span class="dna-dot" style="background:#F7E100;box-shadow:0 0 6px 2px rgba(247,225,0,0.6);"></span><span class="dna-dot right" style="background:#FF2E92;box-shadow:0 0 6px 2px rgba(255,46,146,0.6);"></span></div>
+                            <div class="dna-rung" style="top:100px;"><span class="dna-dot" style="background:#22FFA6;box-shadow:0 0 6px 2px rgba(34,255,166,0.6);"></span><span class="dna-dot right" style="background:#00E5FF;box-shadow:0 0 6px 2px rgba(0,229,255,0.6);"></span></div>
+                            <div class="dna-rung" style="top:120px;"><span class="dna-dot" style="background:#9D6BFF;box-shadow:0 0 6px 2px rgba(157,107,255,0.6);"></span><span class="dna-dot right" style="background:#F7E100;box-shadow:0 0 6px 2px rgba(247,225,0,0.6);"></span></div>
+                            <div class="dna-rung" style="top:140px;"><span class="dna-dot" style="background:#FF2E92;box-shadow:0 0 6px 2px rgba(255,46,146,0.6);"></span><span class="dna-dot right" style="background:#22FFA6;box-shadow:0 0 6px 2px rgba(34,255,166,0.6);"></span></div>
+                            <div class="dna-rung" style="top:160px;"><span class="dna-dot" style="background:#00E5FF;box-shadow:0 0 6px 2px rgba(0,229,255,0.6);"></span><span class="dna-dot right" style="background:#9D6BFF;box-shadow:0 0 6px 2px rgba(157,107,255,0.6);"></span></div>
+                            <div class="dna-rung" style="top:180px;"><span class="dna-dot" style="background:#F7E100;box-shadow:0 0 6px 2px rgba(247,225,0,0.6);"></span><span class="dna-dot right" style="background:#FF2E92;box-shadow:0 0 6px 2px rgba(255,46,146,0.6);"></span></div>
+                        </div>
                     </div>
-                    <h2 class="text-3xl sm:text-4xl font-bold text-white tracking-tight">
+                    <div class="inline-flex items-center gap-2 text-hivis-cyan font-medium text-sm">
+                        <span class="w-2 h-2 rounded-full bg-hivis-cyan"></span>
+                        เกี่ยวกับผม
+                    </div>
+                    <h2 class="gradient-text text-3xl sm:text-4xl font-bold tracking-tight font-display">
                         แรงบันดาลใจและความมุ่งมั่น
                     </h2>
                     <p class="text-concrete-light leading-relaxed">
-                        สวัสดีครับผม <strong class="text-white">ด.ช.กลวัชร โพธิวัฒนานนท์</strong> กำลังศึกษาอยู่ชั้นมัธยมศึกษาปีที่ 3 มีความหลงใหลในด้าน <strong class="text-white">การออกแบบโครงสร้าง กลศาสตร์ และการก่อสร้าง</strong> มาโดยตลอด การได้เห็นอาคาร สะพาน และโครงสร้างทางวิศวกรรม ทำให้ผมเกิดความสนใจอยากเรียนรู้กระบวนการคิด คำนวณ และการออกแบบเพื่อความมั่นคงปลอดภัย
+                        สวัสดีครับผม <strong class="text-white">ด.ช.กลวัชร โพธิวัฒนานนท์</strong> กำลังศึกษาอยู่ชั้นมัธยมศึกษาปีที่ 3 มีความหลงใหลในโลกของ <strong class="text-hivis-green">วิทยาศาสตร์รอบตัว</strong> มาโดยตลอด ไม่ว่าจะเป็นสิ่งมีชีวิตเล็กๆ ใต้กล้องจุลทรรศน์ ปฏิกิริยาเคมีที่เปลี่ยนสีอย่างน่าตื่นเต้น แรงและพลังงานที่อธิบายปรากฏการณ์รอบตัว ไปจนถึงดวงดาวบนท้องฟ้ายามค่ำคืน ทุกอย่างล้วนทำให้ผมอยากตั้งคำถามและค้นหาคำตอบอยู่เสมอ
                     </p>
                     <p class="text-concrete-light leading-relaxed">
-                        ตลอดการเรียนชั้น ม.ต้น ผมตั้งใจศึกษาและฝึกฝนพัฒนาตนเองอย่างต่อเนื่องจนได้ผลการเรียนเฉลี่ยสะสม <strong class="text-safety font-semibold">3.98</strong> โดยเน้นความสำคัญในวิชาคณิตศาสตร์และวิทยาศาสตร์ ควบคู่กับการฝึกเขียนแบบ 3D เบื้องต้น เพื่อเตรียมความพร้อมเข้าศึกษาต่อใน <strong class="text-white">แผนการเรียนเตรียมวิศวกรรมศาสตร์ (เน้นวิศวกรรมโยธา) ชั้น ม.4</strong>
+                        ตลอดการเรียนชั้น ม.ต้น ผมตั้งใจศึกษาและฝึกฝนพัฒนาตนเองอย่างต่อเนื่องจนได้ผลการเรียนเฉลี่ยสะสม <strong class="text-hivis-yellow font-semibold">3.98</strong> โดยเน้นความสำคัญในวิชาชีววิทยา เคมี และฟิสิกส์ ควบคู่กับการฝึกสังเกตการณ์ทางดาราศาสตร์ เพื่อเตรียมความพร้อมเข้าศึกษาต่อใน <strong class="text-white">แผนการเรียนวิทยาศาสตร์-คณิตศาสตร์ ชั้น ม.4</strong>
                     </p>
 
-                    <!-- Key Info Badge -->
-                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-4 border-t border-slate-700">
-                        <div>
-                            <p class="text-xs text-concrete">เกรดเฉลี่ยสะสม (GPAX)</p>
-                            <p class="text-xl font-bold text-safety">3.98</p>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-4 border-t border-hivis-cyan/10 items-center">
+                        <div class="flex items-center gap-3 col-span-2 sm:col-span-1">
+                            <div class="relative w-16 h-16 shrink-0">
+                                <svg viewBox="0 0 64 64" class="w-16 h-16">
+                                    <circle cx="32" cy="32" r="26" fill="none" stroke-width="6" class="gpax-ring-bg"></circle>
+                                    <circle id="gpax-ring-fill" cx="32" cy="32" r="26" fill="none" stroke-width="6" stroke-dasharray="163.36" stroke-dashoffset="163.36" class="gpax-ring-fill"></circle>
+                                </svg>
+                                <span id="gpax-counter" class="absolute inset-0 flex items-center justify-center text-sm font-bold text-hivis-yellow">0.00</span>
+                            </div>
+                            <p class="text-xs text-concrete leading-snug">เกรดเฉลี่ยสะสม<br>(GPAX) / 4.00</p>
                         </div>
                         <div>
                             <p class="text-xs text-concrete">วิชาที่ชื่นชอบ</p>
-                            <p class="text-lg font-bold text-white">คณิตฯ / ฟิสิกส์</p>
+                            <p class="text-lg font-bold text-white">ชีววิทยา / เคมี</p>
                         </div>
                         <div>
                             <p class="text-xs text-concrete">เป้าหมายอนาคต</p>
-                            <p class="text-lg font-bold text-white">วิศวกรโยธา</p>
+                            <p class="text-lg font-bold text-white">นักวิทยาศาสตร์</p>
                         </div>
                     </div>
                 </div>
@@ -193,79 +813,154 @@
 
 
     <!-- ==================== SKILLS SECTION ==================== -->
-    <section id="skills" class="py-20 bg-slate-900">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center max-w-3xl mx-auto mb-16">
-                <h2 class="text-3xl font-bold text-white mb-4">ทักษะและความสามารถ (Skills)</h2>
-                <p class="text-concrete-light">ความพร้อมด้านวิชาการ ทักษะปฏิบัติการ และ Soft Skills สำหรับการเรียนเตรียมวิศวกรรม</p>
+    <section id="skills" class="py-20 bg-blueprint relative overflow-hidden">
+        <div class="aurora-blob w-72 h-72 bg-hivis-cyan top-[-12%] right-[-8%]" style="opacity:0.2;"></div>
+        <div class="aurora-blob w-64 h-64 bg-hivis-orange bottom-[-10%] left-[-6%]" style="opacity:0.2; animation-delay:-4s;"></div>
+        <div class="meteor-shower" aria-hidden="true">
+            <span class="meteor" style="--mt:0%; --ml:20%; --md:4.2s; --mdelay:-0.8s;"></span>
+            <span class="meteor" style="--mt:8%; --ml:50%; --md:5s; --mdelay:-2.2s;"></span>
+            <span class="meteor" style="--mt:2%; --ml:78%; --md:3.6s; --mdelay:-1.5s;"></span>
+            <span class="meteor" style="--mt:15%; --ml:40%; --md:5.6s; --mdelay:-3.1s;"></span>
+            <span class="meteor" style="--mt:0%; --ml:90%; --md:4.8s; --mdelay:-0.2s;"></span>
+            <span class="meteor" style="--mt:22%; --ml:10%; --md:4.4s; --mdelay:-2.8s;"></span>
+        </div>
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="text-center max-w-3xl mx-auto mb-10 reveal flex flex-col items-center">
+                <div class="mini-solar mb-2" aria-hidden="true">
+                    <div class="mini-sun"></div>
+                    <div class="mini-orbit-path" style="width:70px;height:70px; animation: orbit-rotate 4s linear infinite;">
+                        <div class="mini-planet" style="width:8px;height:8px;margin-left:-4px;top:-4px;background:#22FFA6;box-shadow:0 0 6px 2px rgba(34,255,166,0.6);"></div>
+                    </div>
+                    <div class="mini-orbit-path" style="width:100px;height:100px; animation: orbit-rotate 7s linear infinite reverse;">
+                        <div class="mini-planet" style="width:7px;height:7px;margin-left:-3.5px;top:-3.5px;background:#00E5FF;box-shadow:0 0 6px 2px rgba(0,229,255,0.6);"></div>
+                    </div>
+                    <div class="mini-orbit-path" style="width:120px;height:120px; animation: orbit-rotate 10s linear infinite;">
+                        <div class="mini-planet" style="width:9px;height:9px;margin-left:-4.5px;top:-4.5px;background:#9D6BFF;box-shadow:0 0 6px 2px rgba(157,107,255,0.6);"></div>
+                    </div>
+                </div>
+                <h2 class="gradient-text text-3xl font-bold mb-4 font-display">ทักษะและความสามารถ (Skills)</h2>
+                <p class="text-concrete-light">ความพร้อมด้านวิชาการ ทักษะปฏิบัติการในห้องแล็บและการสังเกตการณ์ และ Soft Skills สำหรับสายวิทยาศาสตร์</p>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                
-                <!-- Academic Skills -->
-                <div class="bg-blueprint-card p-6 rounded-xl border border-slate-800 space-y-6">
-                    <h3 class="text-xl font-bold text-white flex items-center gap-2">
-                        <span class="text-safety">📐</span> ด้านวิชาการ (Academic)
-                    </h3>
+
+                <div class="glow-card academic-card reveal relative bg-blueprint-card rounded-xl border border-hivis-cyan/15 space-y-6 transition duration-300 overflow-hidden">
+                    <div class="h-1.5 bg-gradient-to-r from-hivis-green via-hivis-orange to-hivis-cyan"></div>
+                    <span class="micro-dot" style="width:6px;height:6px;top:14%;right:12%;animation-delay:-0.6s;"></span>
+                    <span class="micro-dot" style="width:4px;height:4px;top:26%;right:22%;animation-delay:-2.1s;"></span>
+                    <span class="micro-dot" style="width:5px;height:5px;top:10%;right:30%;animation-delay:-1.3s;"></span>
+                    <div class="px-6 pb-6 space-y-6">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-xl font-bold text-white flex items-center gap-2 font-display">
+                            <span class="text-hivis-green subject-icon-spin">🧬</span> ด้านวิชาการ
+                        </h3>
+                        <div class="flask-icon text-hivis-orange" title="ปฏิกิริยาเคมีในหลอดทดลอง" aria-hidden="true">
+                            <svg viewBox="0 0 26 30" fill="none">
+                                <path d="M10 2v8.5L3.5 24a3 3 0 0 0 2.7 4.3h13.6a3 3 0 0 0 2.7-4.3L16 10.5V2" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                                <path d="M8 2h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                                <path d="M6.5 20h13" stroke="currentColor" stroke-width="1.2" opacity="0.5"/>
+                            </svg>
+                            <span class="flask-bubble" style="left:9px; width:3px; height:3px; animation-delay:0s;"></span>
+                            <span class="flask-bubble" style="left:14px; width:2px; height:2px; animation-delay:-0.6s;"></span>
+                            <span class="flask-bubble" style="left:12px; width:2.5px; height:2.5px; animation-delay:-1.1s;"></span>
+                        </div>
+                    </div>
                     <div class="space-y-4">
-                        <div>
+                        <div class="subject-row">
                             <div class="flex justify-between text-sm mb-1">
-                                <span>คณิตศาสตร์ (Mathematics)</span>
-                                <span class="text-safety">95%</span>
+                                <span>ชีววิทยา (Biology)</span>
+                                <span class="text-hivis-green subject-pct" data-target="92">0%</span>
                             </div>
-                            <div class="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
-                                <div class="bg-safety h-full rounded-full" style="width: 95%"></div>
+                            <div class="w-full bg-blueprint-light h-2 rounded-full overflow-hidden">
+                                <div class="skill-bar-fill bg-hivis-green h-full rounded-full" style="--target-width: 92%"></div>
                             </div>
                         </div>
-                        <div>
+                        <div class="subject-row">
                             <div class="flex justify-between text-sm mb-1">
-                                <span>ฟิสิกส์พื้นฐาน (Physics)</span>
-                                <span class="text-safety">90%</span>
+                                <span>เคมี (Chemistry)</span>
+                                <span class="text-hivis-orange subject-pct" data-target="88">0%</span>
                             </div>
-                            <div class="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
-                                <div class="bg-safety h-full rounded-full" style="width: 90%"></div>
+                            <div class="w-full bg-blueprint-light h-2 rounded-full overflow-hidden">
+                                <div class="skill-bar-fill bg-hivis-orange h-full rounded-full" style="--target-width: 88%"></div>
+                            </div>
+                        </div>
+                        <div class="subject-row">
+                            <div class="flex justify-between text-sm mb-1">
+                                <span>ฟิสิกส์ (Physics)</span>
+                                <span class="text-hivis-cyan subject-pct" data-target="90">0%</span>
+                            </div>
+                            <div class="w-full bg-blueprint-light h-2 rounded-full overflow-hidden">
+                                <div class="skill-bar-fill bg-hivis-cyan h-full rounded-full" style="--target-width: 90%"></div>
                             </div>
                         </div>
                     </div>
-                </div>
-
-                <!-- Practical Skills -->
-                <div class="bg-blueprint-card p-6 rounded-xl border border-slate-800 space-y-6">
-                    <h3 class="text-xl font-bold text-white flex items-center gap-2">
-                        <span class="text-safety">💻</span> ด้านปฏิบัติการ (Practical)
-                    </h3>
-                    <div class="space-y-4">
-                        <div>
-                            <div class="flex justify-between text-sm mb-1">
-                                <span>การวาดแบบ 3D (SketchUp)</span>
-                                <span class="text-safety">85%</span>
-                            </div>
-                            <div class="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
-                                <div class="bg-safety h-full rounded-full" style="width: 85%"></div>
-                            </div>
+                    <div class="flex items-center gap-3 pt-1" title="เซลล์กำลังแบ่งตัว (Mitosis)" aria-hidden="true">
+                        <div class="cell-mitosis shrink-0">
+                            <span class="cell"></span><span class="nucleus" style="animation: mitosis-split 3.2s ease-in-out infinite;"></span>
+                            <span class="cell b"></span><span class="nucleus" style="animation: mitosis-split-b 3.2s ease-in-out infinite;"></span>
                         </div>
-                        <div>
-                            <div class="flex justify-between text-sm mb-1">
-                                <span>AutoCAD พื้นฐาน</span>
-                                <span class="text-safety">70%</span>
-                            </div>
-                            <div class="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
-                                <div class="bg-safety h-full rounded-full" style="width: 70%"></div>
-                            </div>
-                        </div>
+                        <svg class="heartbeat-pulse flex-1" viewBox="0 0 200 40" preserveAspectRatio="none">
+                            <path d="M0,20 L45,20 L55,4 L65,36 L75,20 L200,20"></path>
+                        </svg>
+                    </div>
                     </div>
                 </div>
 
-                <!-- Soft Skills -->
-                <div class="bg-blueprint-card p-6 rounded-xl border border-slate-800 space-y-6">
-                    <h3 class="text-xl font-bold text-white flex items-center gap-2">
-                        <span class="text-safety">🤝</span> Soft Skills & อื่นๆ
-                    </h3>
+                <div class="glow-card reveal bg-blueprint-card rounded-xl border border-hivis-cyan/15 space-y-6 transition duration-300 overflow-hidden">
+                    <div class="h-1.5 bg-gradient-to-r from-hivis-cyan via-hivis-violet to-hivis-pink"></div>
+                    <div class="px-6 pb-6 space-y-6">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-xl font-bold text-white flex items-center gap-2 font-display">
+                            <span class="text-hivis-violet">🔭</span> ด้านปฏิบัติการ
+                        </h3>
+                        <div class="physics-orbit-mini" title="อิเล็กตรอนโคจร" aria-hidden="true">
+                            <span class="ring"><span class="dot"></span></span>
+                            <span class="ring"><span class="dot"></span></span>
+                        </div>
+                    </div>
+                    <div class="space-y-4">
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span>การใช้กล้องจุลทรรศน์ (Microscope)</span>
+                                <span class="text-hivis-cyan">85%</span>
+                            </div>
+                            <div class="w-full bg-blueprint-light h-2 rounded-full overflow-hidden">
+                                <div class="skill-bar-fill bg-gradient-to-r from-hivis-cyan to-hivis-green h-full rounded-full" style="--target-width: 85%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span>การสังเกตการณ์ทางดาราศาสตร์ (Telescope)</span>
+                                <span class="text-hivis-violet">75%</span>
+                            </div>
+                            <div class="w-full bg-blueprint-light h-2 rounded-full overflow-hidden">
+                                <div class="skill-bar-fill bg-gradient-to-r from-hivis-violet to-hivis-pink h-full rounded-full" style="--target-width: 75%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="pendulum-box" title="การแกว่งของลูกตุ้ม (Physics)" aria-hidden="true">
+                        <div class="pendulum-arm"><div class="pendulum-bob"></div></div>
+                    </div>
+                    </div>
+                </div>
+
+                <div class="glow-card reveal bg-blueprint-card rounded-xl border border-hivis-cyan/15 space-y-6 transition duration-300 overflow-hidden">
+                    <div class="h-1.5 bg-gradient-to-r from-hivis-pink via-hivis-yellow to-hivis-green"></div>
+                    <div class="px-6 pb-6 space-y-6">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-xl font-bold text-white flex items-center gap-2 font-display">
+                            <span class="text-hivis-pink">🤝</span> Soft Skills
+                        </h3>
+                    </div>
                     <div class="flex flex-wrap gap-2 pt-2">
-                        <span class="px-3 py-1.5 bg-slate-700 text-slate-200 rounded-md text-sm border border-slate-600">การแก้ปัญหา (Problem Solving)</span>
-                        <span class="px-3 py-1.5 bg-slate-700 text-slate-200 rounded-md text-sm border border-slate-600">การทำงานเป็นทีม (Teamwork)</span>
-                        <span class="px-3 py-1.5 bg-slate-700 text-slate-200 rounded-md text-sm border border-slate-600">การวางแผน (Planning)</span>
-                        <span class="px-3 py-1.5 bg-slate-700 text-slate-200 rounded-md text-sm border border-slate-600">ความคิดสร้างสรรค์ (Creativity)</span>
+                        <span class="px-3 py-1.5 bg-hivis-green/10 text-slate-200 rounded-md text-sm border border-hivis-green/40">การตั้งสมมติฐาน</span>
+                        <span class="px-3 py-1.5 bg-hivis-orange/10 text-slate-200 rounded-md text-sm border border-hivis-orange/40">การแก้ปัญหา</span>
+                        <span class="px-3 py-1.5 bg-hivis-cyan/10 text-slate-200 rounded-md text-sm border border-hivis-cyan/40">การทำงานเป็นทีม</span>
+                        <span class="px-3 py-1.5 bg-hivis-violet/10 text-slate-200 rounded-md text-sm border border-hivis-violet/40">ความคิดสร้างสรรค์</span>
+                        <span class="px-3 py-1.5 bg-hivis-pink/10 text-slate-200 rounded-md text-sm border border-hivis-pink/40">การสื่อสาร</span>
+                        <span class="px-3 py-1.5 bg-hivis-yellow/10 text-slate-200 rounded-md text-sm border border-hivis-yellow/40">ความอยากรู้อยากเห็น</span>
+                    </div>
+                    <div class="comet-track" aria-hidden="true"><span class="comet" style="animation-delay:-1.8s;"></span></div>
                     </div>
                 </div>
 
@@ -275,198 +970,35 @@
 
 
     <!-- ==================== PROJECTS / ACTIVITIES SECTION ==================== -->
-    <section id="projects" class="py-20 bg-blueprint-card border-t border-slate-800">
+    <section id="projects" class="py-20 bg-blueprint-card border-t border-hivis-cyan/10">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center max-w-3xl mx-auto mb-16">
-                <h2 class="text-3xl font-bold text-white mb-4">ผลงานและกิจกรรม (Projects & Activities)</h2>
-                <p class="text-concrete-light">สรุป 10 ผลงานและกิจกรรมที่ภาคภูมิใจในการฝึกฝนทักษะด้านวิศวกรรมและวิทยาศาสตร์</p>
+            <div class="text-center max-w-3xl mx-auto mb-16 reveal">
+                <h2 class="text-3xl font-bold text-white mb-4 font-display">ผลงานและกิจกรรม (Projects & Activities)</h2>
+                <p class="text-concrete-light">สรุป 10 ผลงานและกิจกรรมที่ภาคภูมิใจ ครอบคลุมชีววิทยา เคมี ฟิสิกส์ และดาราศาสตร์</p>
             </div>
 
-            <!-- Card Grid -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                
-                <!-- Project 1 -->
-                <div class="bg-slate-900 rounded-xl overflow-hidden border border-slate-800 hover:border-safety transition duration-300 flex flex-col group">
-                    <div class="relative h-48 w-full overflow-hidden bg-slate-800 border-b border-slate-800">
-                        <span class="absolute top-3 left-3 z-10 px-2.5 py-1 bg-slate-900/80 backdrop-blur-md rounded-md text-xs font-bold text-safety border border-slate-700">01</span>
-                        <!-- ใส่ URL รูปภาพผลงานที่ 1 -->
-                        <img src="https://via.placeholder.com/600x400?text=Project+1" alt="โครงงานสะพานไม้ไอติมรับน้ำหนัก" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
-                    </div>
-                    <div class="p-6 flex-1 flex flex-col justify-between">
-                        <div>
-                            <span class="text-xs font-semibold text-safety uppercase tracking-wider">โครงงานสิ่งประดิษฐ์</span>
-                            <h3 class="text-lg font-bold text-white mt-1 mb-2">โครงงานสะพานไม้ไอติมรับน้ำหนัก</h3>
-                            <p class="text-concrete text-sm leading-relaxed">ออกแบบโครงสร้างสะพานรับน้ำหนักโดยใช้หลักการ Truss ช่วยให้สะพานรับน้ำหนักจำลองได้สูงสุดในการทดสอบ</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Project 2 -->
-                <div class="bg-slate-900 rounded-xl overflow-hidden border border-slate-800 hover:border-safety transition duration-300 flex flex-col group">
-                    <div class="relative h-48 w-full overflow-hidden bg-slate-800 border-b border-slate-800">
-                        <span class="absolute top-3 left-3 z-10 px-2.5 py-1 bg-slate-900/80 backdrop-blur-md rounded-md text-xs font-bold text-safety border border-slate-700">02</span>
-                        <!-- ใส่ URL รูปภาพผลงานที่ 2 -->
-                        <img src="https://via.placeholder.com/600x400?text=Project+2" alt="ค่ายเยาวชน STEM Youth Engineering" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
-                    </div>
-                    <div class="p-6 flex-1 flex flex-col justify-between">
-                        <div>
-                            <span class="text-xs font-semibold text-safety uppercase tracking-wider">กิจกรรมค่าย</span>
-                            <h3 class="text-lg font-bold text-white mt-1 mb-2">ค่ายเยาวชน STEM Youth Engineering</h3>
-                            <p class="text-concrete text-sm leading-relaxed">เข้าร่วมค่ายเพื่อเรียนรู้พื้นฐานทางวิศวกรรม การแก้ปัญหาเฉพาะหน้า และการทำงานร่วมกันเป็นทีม</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Project 3 -->
-                <div class="bg-slate-900 rounded-xl overflow-hidden border border-slate-800 hover:border-safety transition duration-300 flex flex-col group">
-                    <div class="relative h-48 w-full overflow-hidden bg-slate-800 border-b border-slate-800">
-                        <span class="absolute top-3 left-3 z-10 px-2.5 py-1 bg-slate-900/80 backdrop-blur-md rounded-md text-xs font-bold text-safety border border-slate-700">03</span>
-                        <!-- ใส่ URL รูปภาพผลงานที่ 3 -->
-                        <img src="https://via.placeholder.com/600x400?text=Project+3" alt="แบบจำลองบ้านพักอาศัย 3D" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
-                    </div>
-                    <div class="p-6 flex-1 flex flex-col justify-between">
-                        <div>
-                            <span class="text-xs font-semibold text-safety uppercase tracking-wider">การออกแบบ</span>
-                            <h3 class="text-lg font-bold text-white mt-1 mb-2">แบบจำลองบ้านพักอาศัย 3D (SketchUp)</h3>
-                            <p class="text-concrete text-sm leading-relaxed">เขียนแบบจำลองอาคารพักอาศัย 2 ชั้น เรียนรู้การวางทิศทางลม โครงสร้างเสาและคานเบื้องต้น</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Project 4 -->
-                <div class="bg-slate-900 rounded-xl overflow-hidden border border-slate-800 hover:border-safety transition duration-300 flex flex-col group">
-                    <div class="relative h-48 w-full overflow-hidden bg-slate-800 border-b border-slate-800">
-                        <span class="absolute top-3 left-3 z-10 px-2.5 py-1 bg-slate-900/80 backdrop-blur-md rounded-md text-xs font-bold text-safety border border-slate-700">04</span>
-                        <!-- ใส่ URL รูปภาพผลงานที่ 4 -->
-                        <img src="https://via.placeholder.com/600x400?text=Project+4" alt="แข่งตอบปัญหาคณิตศาสตร์-ฟิสิกส์" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
-                    </div>
-                    <div class="p-6 flex-1 flex flex-col justify-between">
-                        <div>
-                            <span class="text-xs font-semibold text-safety uppercase tracking-wider">การแข่งขัน</span>
-                            <h3 class="text-lg font-bold text-white mt-1 mb-2">แข่งตอบปัญหาคณิตศาสตร์-ฟิสิกส์</h3>
-                            <p class="text-concrete text-sm leading-relaxed">ตัวแทนนักเรียนเข้าร่วมการแข่งตอบปัญหาทางวิชาการ เพื่อทดสอบทักษะการคำนวณและตรรกะเชิงวิทยาศาสตร์</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Project 5 -->
-                <div class="bg-slate-900 rounded-xl overflow-hidden border border-slate-800 hover:border-safety transition duration-300 flex flex-col group">
-                    <div class="relative h-48 w-full overflow-hidden bg-slate-800 border-b border-slate-800">
-                        <span class="absolute top-3 left-3 z-10 px-2.5 py-1 bg-slate-900/80 backdrop-blur-md rounded-md text-xs font-bold text-safety border border-slate-700">05</span>
-                        <!-- ใส่ URL รูปภาพผลงานที่ 5 -->
-                        <img src="https://via.placeholder.com/600x400?text=Project+5" alt="แบบจำลองอาคารต้านแรงสั่นสะเทือน" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
-                    </div>
-                    <div class="p-6 flex-1 flex flex-col justify-between">
-                        <div>
-                            <span class="text-xs font-semibold text-safety uppercase tracking-wider">การทดลอง</span>
-                            <h3 class="text-lg font-bold text-white mt-1 mb-2">แบบจำลองอาคารต้านแรงสั่นสะเทือน</h3>
-                            <p class="text-concrete text-sm leading-relaxed">ศึกษาผลของแรงสั่นสะเทือนต่ออาคารสูง พร้อมประดิษฐ์ระบบโช้คอัพจำลองเพื่อลดการโคลงตัวของโครงสร้าง</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Project 6 -->
-                <div class="bg-slate-900 rounded-xl overflow-hidden border border-slate-800 hover:border-safety transition duration-300 flex flex-col group">
-                    <div class="relative h-48 w-full overflow-hidden bg-slate-800 border-b border-slate-800">
-                        <span class="absolute top-3 left-3 z-10 px-2.5 py-1 bg-slate-900/80 backdrop-blur-md rounded-md text-xs font-bold text-safety border border-slate-700">06</span>
-                        <!-- ใส่ URL รูปภาพผลงานที่ 6 -->
-                        <img src="https://via.placeholder.com/600x400?text=Project+6" alt="การศึกษาคุณสมบัติส่วนผสมคอนกรีต" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
-                    </div>
-                    <div class="p-6 flex-1 flex flex-col justify-between">
-                        <div>
-                            <span class="text-xs font-semibold text-safety uppercase tracking-wider">โครงงานค้นคว้า</span>
-                            <h3 class="text-lg font-bold text-white mt-1 mb-2">การศึกษาคุณสมบัติส่วนผสมคอนกรีต</h3>
-                            <p class="text-concrete text-sm leading-relaxed">ค้นคว้าและศึกษาข้อมูลเกี่ยวกับกำลังอัดของคอนกรีตและการใช้วัสดุทดแทนเพื่อความยั่งยืน</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Project 7 -->
-                <div class="bg-slate-900 rounded-xl overflow-hidden border border-slate-800 hover:border-safety transition duration-300 flex flex-col group">
-                    <div class="relative h-48 w-full overflow-hidden bg-slate-800 border-b border-slate-800">
-                        <span class="absolute top-3 left-3 z-10 px-2.5 py-1 bg-slate-900/80 backdrop-blur-md rounded-md text-xs font-bold text-safety border border-slate-700">07</span>
-                        <!-- ใส่ URL รูปภาพผลงานที่ 7 -->
-                        <img src="https://via.placeholder.com/600x400?text=Project+7" alt="จิตอาสาปรับปรุงอาคารและสถานที่" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
-                    </div>
-                    <div class="p-6 flex-1 flex flex-col justify-between">
-                        <div>
-                            <span class="text-xs font-semibold text-safety uppercase tracking-wider">จิตอาสา</span>
-                            <h3 class="text-lg font-bold text-white mt-1 mb-2">จิตอาสาปรับปรุงอาคารและสถานที่</h3>
-                            <p class="text-concrete text-sm leading-relaxed">เข้าร่วมกิจกรรมซ่อมแซมโต๊ะ เก้าอี้ และปรับปรุงภูมิทัศน์ความปลอดภัยภายในโรงเรียน</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Project 8 -->
-                <div class="bg-slate-900 rounded-xl overflow-hidden border border-slate-800 hover:border-safety transition duration-300 flex flex-col group">
-                    <div class="relative h-48 w-full overflow-hidden bg-slate-800 border-b border-slate-800">
-                        <span class="absolute top-3 left-3 z-10 px-2.5 py-1 bg-slate-900/80 backdrop-blur-md rounded-md text-xs font-bold text-safety border border-slate-700">08</span>
-                        <!-- ใส่ URL รูปภาพผลงานที่ 8 -->
-                        <img src="https://via.placeholder.com/600x400?text=Project+8" alt="การฝึกทักษะการวัดระดับและระยะเบื้องต้น" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
-                    </div>
-                    <div class="p-6 flex-1 flex flex-col justify-between">
-                        <div>
-                            <span class="text-xs font-semibold text-safety uppercase tracking-wider">การเรียนรู้ปฏิบัติ</span>
-                            <h3 class="text-lg font-bold text-white mt-1 mb-2">การฝึกทักษะการวัดระดับและระยะเบื้องต้น</h3>
-                            <p class="text-concrete text-sm leading-relaxed">ศึกษาหลักการทำงานของเครื่องมือสำรวจเบื้องต้นในการกิจกรรมแนะแนวสายอาชีพวิศวกร</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Project 9 -->
-                <div class="bg-slate-900 rounded-xl overflow-hidden border border-slate-800 hover:border-safety transition duration-300 flex flex-col group">
-                    <div class="relative h-48 w-full overflow-hidden bg-slate-800 border-b border-slate-800">
-                        <span class="absolute top-3 left-3 z-10 px-2.5 py-1 bg-slate-900/80 backdrop-blur-md rounded-md text-xs font-bold text-safety border border-slate-700">09</span>
-                        <!-- ใส่ URL รูปภาพผลงานที่ 9 -->
-                        <img src="https://via.placeholder.com/600x400?text=Project+9" alt="โมเดลกลศาสตร์เรื่องคานและการส่งผ่านแรง" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
-                    </div>
-                    <div class="p-6 flex-1 flex flex-col justify-between">
-                        <div>
-                            <span class="text-xs font-semibold text-safety uppercase tracking-wider">กลศาสตร์</span>
-                            <h3 class="text-lg font-bold text-white mt-1 mb-2">โมเดลกลศาสตร์เรื่องคานและการส่งผ่านแรง</h3>
-                            <p class="text-concrete text-sm leading-relaxed">ประดิษฐ์สิ่งประดิษฐ์จำลองเพื่อทดลองหาจุดสมดุล การคำนวณโมเมนต์ของแรงในวิชาฟิสิกส์</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Project 10 -->
-                <div class="bg-slate-900 rounded-xl overflow-hidden border border-slate-800 hover:border-safety transition duration-300 flex flex-col group">
-                    <div class="relative h-48 w-full overflow-hidden bg-slate-800 border-b border-slate-800">
-                        <span class="absolute top-3 left-3 z-10 px-2.5 py-1 bg-slate-900/80 backdrop-blur-md rounded-md text-xs font-bold text-safety border border-slate-700">10</span>
-                        <!-- ใส่ URL รูปภาพผลงานที่ 10 -->
-                        <img src="https://via.placeholder.com/600x400?text=Project+10" alt="นำเสนอผลงานสิ่งประดิษฐ์ในงาน Open House" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
-                    </div>
-                    <div class="p-6 flex-1 flex flex-col justify-between">
-                        <div>
-                            <span class="text-xs font-semibold text-safety uppercase tracking-wider">นิทรรศการ</span>
-                            <h3 class="text-lg font-bold text-white mt-1 mb-2">นำเสนอผลงานสิ่งประดิษฐ์ในงาน Open House</h3>
-                            <p class="text-concrete text-sm leading-relaxed">อธิบายหลักการทำงานของโมเดลโครงสร้างให้ผู้เยี่ยมชม นิทรรศการวิชาการของโรงเรียน</p>
-                        </div>
-                    </div>
-                </div>
-
-            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8" id="projects-grid"></div>
         </div>
     </section>
 
 
     <!-- ==================== CONTACT & FOOTER SECTION ==================== -->
-    <footer id="contact" class="bg-slate-950 text-slate-400 py-16 border-t border-slate-800">
+    <footer id="contact" class="bg-blueprint text-slate-400 py-16 border-t border-hivis-cyan/10">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
-                
+
                 <div>
-                    <h3 class="text-2xl font-bold text-white mb-2">ข้อมูลการติดต่อ (Contact Info)</h3>
+                    <h3 class="text-2xl font-bold text-white mb-2 font-display">ข้อมูลการติดต่อ</h3>
                     <p class="text-concrete-light mb-6">ด.ช.กลวัชร โพธิวัฒนานนท์ (ผู้สมัครเข้าศึกษาต่อ ม.4)</p>
                     <div class="space-y-3">
                         <p class="flex items-center gap-3">
-                            <span class="text-safety">✉️</span> Email: <a href="mailto:konlawat.p@gmail.com" class="text-white hover:underline">konlawat.p@gmail.com</a>
+                            <span class="text-hivis-yellow">✉️</span> Email: <a href="mailto:konlawat.p@gmail.com" class="text-white hover:text-hivis-cyan hover:underline">konlawat.p@gmail.com</a>
                         </p>
                         <p class="flex items-center gap-3">
-                            <span class="text-safety">📞</span> Phone: <span class="text-white">081-234-5678</span>
+                            <span class="text-hivis-orange">📞</span> Phone: <span class="text-white">081-234-5678</span>
                         </p>
                         <p class="flex items-center gap-3">
-                            <span class="text-safety">📍</span> Location: กรุงเทพมหานคร, ประเทศไทย
+                            <span class="text-hivis-cyan">📍</span> Location: กรุงเทพมหานคร, ประเทศไทย
                         </p>
                     </div>
                 </div>
@@ -474,16 +1006,16 @@
                 <div class="flex flex-col justify-center items-start md:items-end">
                     <h4 class="text-lg font-semibold text-white mb-4">ช่องทางติดตามผลงานเพิ่มเติม</h4>
                     <div class="flex space-x-3">
-                        <span class="px-4 py-2 bg-slate-900 border border-slate-800 rounded-lg text-sm text-slate-300">GitHub</span>
-                        <span class="px-4 py-2 bg-slate-900 border border-slate-800 rounded-lg text-sm text-slate-300">Facebook</span>
+                        <span class="px-4 py-2 bg-blueprint-light border border-hivis-cyan/20 rounded-lg text-sm text-slate-300">GitHub</span>
+                        <span class="px-4 py-2 bg-blueprint-light border border-hivis-cyan/20 rounded-lg text-sm text-slate-300">Facebook</span>
                     </div>
                 </div>
 
             </div>
 
-            <div class="border-t border-slate-800 pt-8 text-center text-sm text-concrete">
+            <div class="border-t border-hivis-cyan/10 pt-8 text-center text-sm text-concrete">
                 <p>Copyright © 2026 ด.ช.กลวัชร โพธิวัฒนานนท์. All Rights Reserved.</p>
-                <p class="mt-1 text-xs text-slate-600">เว็บไซต์พอร์ตโฟลิโอเพื่อการสมัครเรียนต่อ ชั้นมัธยมศึกษาปีที่ 4 แผนการเรียนเตรียมวิศวกรรมศาสตร์ (โยธา)</p>
+                <p class="mt-1 text-xs text-slate-600">เว็บไซต์พอร์ตโฟลิโอเพื่อการสมัครเรียนต่อ ชั้นมัธยมศึกษาปีที่ 4 แผนการเรียนวิทยาศาสตร์-คณิตศาสตร์</p>
             </div>
         </div>
     </footer>
@@ -491,21 +1023,345 @@
 
     <!-- ==================== JAVASCRIPT ==================== -->
     <script>
-        // Toggle Mobile Menu
+        // Mobile menu
         const mobileMenuBtn = document.getElementById('mobile-menu-btn');
         const mobileMenu = document.getElementById('mobile-menu');
-        const mobileLinks = document.querySelectorAll('.mobile-link');
-
-        mobileMenuBtn.addEventListener('click', () => {
-            mobileMenu.classList.toggle('hidden');
+        document.querySelectorAll('.mobile-link').forEach(link => {
+            link.addEventListener('click', () => mobileMenu.classList.add('hidden'));
         });
+        mobileMenuBtn.addEventListener('click', () => mobileMenu.classList.toggle('hidden'));
 
-        // Close mobile menu when a link is clicked
-        mobileLinks.forEach(link => {
-            link.addEventListener('click', () => {
-                mobileMenu.classList.add('hidden');
+        // ---------- Mouse-move parallax ----------
+        const heroSection = document.getElementById('hero');
+        const grid = document.getElementById('parallax-grid');
+        const icons = document.querySelectorAll('#parallax-icons .parallax-layer');
+
+        heroSection.addEventListener('mousemove', (e) => {
+            const rect = heroSection.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / rect.width - 0.5;
+            const y = (e.clientY - rect.top) / rect.height - 0.5;
+
+            grid.style.transform = `translate(${x * -20}px, ${y * -20}px)`;
+
+            icons.forEach(icon => {
+                const depth = parseFloat(icon.dataset.depth) || 40;
+                icon.style.transform = `translate(${x * depth}px, ${y * depth}px)`;
             });
         });
+        heroSection.addEventListener('mouseleave', () => {
+            grid.style.transform = 'translate(0,0)';
+            icons.forEach(icon => icon.style.transform = 'translate(0,0)');
+        });
+
+        // ---------- Draggable letters (incl. Thai vowels & tone marks) in the hero title ----------
+        const titleText = 'กลวัชร โพธิวัฒนานนท์';
+        const titleEl = document.getElementById('drag-title');
+        const thaiMarkPattern = /[\u0E31\u0E34-\u0E3A\u0E47-\u0E4E]/;
+
+        [...titleText].forEach(ch => {
+            const span = document.createElement('span');
+            span.textContent = ch === ' ' ? '\u00A0' : ch;
+            if (ch !== ' ') {
+                span.classList.add('letter-drag');
+                if (thaiMarkPattern.test(ch)) {
+                    span.classList.add('is-mark');
+                }
+            }
+            titleEl.appendChild(span);
+        });
+
+        let activeDrag = null;
+        let startX = 0, startY = 0, origX = 0, origY = 0;
+
+        // ---------- Tiny synth blips (no audio files needed) ----------
+        let audioCtx = null;
+        function playBlip(freq = 440, duration = 0.08) {
+            try {
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+                osc.connect(gain).connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch (err) { /* audio not available — silently skip */ }
+        }
+
+        function getXY(e) {
+            if (e.touches && e.touches.length) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            return { x: e.clientX, y: e.clientY };
+        }
+
+        // Cool science-tone palette for dragging letters (no yellow/orange)
+        const dragColors = [
+            { color: '#00E5FF', glow: 'rgba(0,229,255,0.7)' },
+            { color: '#22FFA6', glow: 'rgba(34,255,166,0.7)' },
+            { color: '#9D6BFF', glow: 'rgba(157,107,255,0.7)' },
+            { color: '#FF2E92', glow: 'rgba(255,46,146,0.7)' },
+        ];
+
+        function onDragStart(e) {
+            const target = e.target.closest('.letter-drag');
+            if (!target) return;
+            activeDrag = target;
+            const p = getXY(e);
+            startX = p.x; startY = p.y;
+            const style = getComputedStyle(target);
+            const matrix = new DOMMatrixReadOnly(style.transform);
+            origX = matrix.m41; origY = matrix.m42;
+            const pick = dragColors[Math.floor(Math.random() * dragColors.length)];
+            target.style.setProperty('--drag-color', pick.color);
+            target.style.setProperty('--drag-glow', pick.glow);
+            target.classList.add('dragging');
+            playBlip(520, 0.06);
+            e.preventDefault();
+        }
+
+        function onDragMove(e) {
+            if (!activeDrag) return;
+            const p = getXY(e);
+            const dx = p.x - startX;
+            const dy = p.y - startY;
+            const nx = origX + dx;
+            const ny = origY + dy;
+            const rotate = Math.max(-15, Math.min(15, dx * 0.15));
+            activeDrag.style.transform = `translate(${nx}px, ${ny}px) rotate(${rotate}deg)`;
+        }
+
+        function onDragEnd(e) {
+            if (!activeDrag) return;
+            const rect = activeDrag.getBoundingClientRect();
+            burstSparks(rect.left + rect.width / 2, rect.top + rect.height / 2, 14);
+            playBlip(300, 0.09);
+            activeDrag.classList.remove('dragging');
+            activeDrag.style.transition = 'transform 0.5s cubic-bezier(.34,1.56,.64,1)';
+            activeDrag.style.transform = 'translate(0px, 0px) rotate(0deg)';
+            const el = activeDrag;
+            setTimeout(() => { el.style.transition = ''; }, 500);
+            activeDrag = null;
+        }
+
+        titleEl.addEventListener('mousedown', onDragStart);
+        window.addEventListener('mousemove', onDragMove);
+        window.addEventListener('mouseup', onDragEnd);
+        titleEl.addEventListener('touchstart', onDragStart, { passive: false });
+        window.addEventListener('touchmove', onDragMove, { passive: false });
+        window.addEventListener('touchend', onDragEnd);
+
+        // ---------- Custom cursor: dot snaps instantly, ring trails with easing ----------
+        const cursorDot = document.getElementById('cursor-dot');
+        const cursorRing = document.getElementById('cursor-ring');
+        let mouseX = window.innerWidth / 2, mouseY = window.innerHeight / 2;
+        let ringX = mouseX, ringY = mouseY;
+
+        window.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+            cursorDot.style.left = mouseX + 'px';
+            cursorDot.style.top = mouseY + 'px';
+        });
+
+        function animateCursorRing() {
+            ringX += (mouseX - ringX) * 0.18;
+            ringY += (mouseY - ringY) * 0.18;
+            cursorRing.style.left = ringX + 'px';
+            cursorRing.style.top = ringY + 'px';
+            const dx = mouseX - ringX;
+            cursorRing.style.transform = `translate(-50%, -50%) rotate(${dx * 1.5}deg)`;
+            requestAnimationFrame(animateCursorRing);
+        }
+        animateCursorRing();
+
+        document.querySelectorAll('a, button').forEach(el => {
+            el.addEventListener('mouseenter', () => cursorRing.classList.add('hover-link'));
+            el.addEventListener('mouseleave', () => cursorRing.classList.remove('hover-link'));
+        });
+        titleEl.addEventListener('mouseover', (e) => {
+            if (e.target.closest('.letter-drag')) cursorRing.classList.add('hover-drag');
+        });
+        titleEl.addEventListener('mouseout', (e) => {
+            if (e.target.closest('.letter-drag')) cursorRing.classList.remove('hover-drag');
+        });
+        titleEl.addEventListener('mousedown', () => cursorRing.classList.add('hover-drag'));
+        window.addEventListener('mouseup', () => cursorRing.classList.remove('hover-drag'));
+
+        // ---------- Projects data ----------
+        // [num, icon, tag, title, desc, skillsGained, result, accent]
+        const projects = [
+            ['01','🌱','ชีววิทยา','โครงงานศึกษาการเจริญเติบโตของพืชภายใต้แสงสีต่างๆ','ทดลองปลูกพืชภายใต้แสงสี LED ที่แตกต่างกัน เพื่อศึกษาผลของความยาวคลื่นแสงต่ออัตราการสังเคราะห์แสง','การออกแบบการทดลองแบบมีตัวแปรควบคุม, การบันทึกและวิเคราะห์ข้อมูล','พืชที่ได้รับแสงสีแดง-น้ำเงินเจริญเติบโตได้ดีกว่ากลุ่มควบคุมอย่างชัดเจน','hivis-green'],
+            ['02','🧪','เคมี','การทดลองปฏิกิริยาเคมีสีสันมหัศจรรย์ (Chemistry Show)','จัดการแสดงปฏิกิริยาเคมีที่เปลี่ยนสีและเกิดฟองในงานวันวิทยาศาสตร์ของโรงเรียน','ความปลอดภัยในห้องปฏิบัติการ, การอธิบายหลักการเคมีให้เข้าใจง่าย','ผู้ชมกว่า 100 คนได้เรียนรู้ปฏิกิริยากรด-เบสผ่านการทดลองสด','hivis-orange'],
+            ['03','⚡','ฟิสิกส์','การแข่ง STEM','ประดิษฐ์สะพานไม้ไอศกรีม','ใช้กฏโมเมตัม, กฏรับน้ำหนักของสะพานและแรงตึงของสะพานไม้และ','แรงตึงของสะพานไม้และการจัดสรรการใช้อุปกรณ์ และได้รางวัลชนะเลิศ','hivis-cyan'],
+            ['04','🔭','ดาราศาสตร์','การผ่านเข้าสู่สอวน.ดาราศาสตร์ ค่าย 1 และ 2','เข้าร่วมค่ายดาราศาสตร์ของโครงการมูลนิธิสอวน จัดกิจกรรมส่องดาวยามค่ำคืนร่วมกับเพื่อนๆ','การใช้กล้องโทรทรรศน์เบื้องต้น, การอ่านแผนที่ดาว,สามารถระบุตำแหน่งดาวเคราะห์และกลุ่มดาวสำคัญได้ด้วยตนเอง','ได้เป็นตัวแทนโรงเรียนสอนพี่สอนน้อง','hivis-violet'],
+            ['05','🦠','ชีวิทยา','ผ่ากบ','เก็บตัวอย่างอวัยวะต่างๆ มาศึกษาผ่าทดลองดู และจำแนกชนิดเบื้องต้น','การเตรียมสไลด์ตัวอย่าง, การใช้เครื่องมือผ่าตัดอย่างถูกต้อง','เข้าใจระบบต่างๆของกบตัวทดลองอย่างแจ่มแจ้ง','hivis-green'],
+            ['06','💎','เคมี','ปลูกผลึกคอปเปอร์ซัลเฟต (Crystal Growing)','ทดลองปลูกผลึกคอปเปอร์ซัลเฟตจากสารละลายอิ่มตัว ศึกษาปัจจัยที่มีผลต่อขนาดผลึก','ความเข้าใจเรื่องสารละลายอิ่มตัวและการตกผลึก, ความอดทนในการรอผล','ได้ผลึกคอปเปอร์ซัลเฟตสีฟ้าขนาดใหญ่และสวยงามเกินคาด','hivis-orange'],
+            ['07','🧑‍🔬','ฟิสิกส์','ค่ายเยาวชนวิทยาศาสตร์ STEM Youth Camp','เข้าร่วมค่ายวิทยาศาสตร์เพื่อเรียนรู้พื้นฐานฟิสิกส์ การแก้ปัญหาเฉพาะหน้า และการทำงานร่วมกันเป็นทีม','การทำงานเป็นทีมข้ามโรงเรียน, การประยุกต์ทฤษฎีสู่การทดลองจริง','ได้รับรางวัลรองชนะเลิศกิจกรรมประดิษฐ์อุปกรณ์วิทยาศาสตร์ของค่าย','hivis-cyan'],
+            ['08','🌘','ดาราศาสตร์','สังเกตการณ์ปรากฏการณ์จันทรุปราคา','เฝ้าสังเกตและบันทึกภาพปรากฏการณ์จันทรุปราคาเต็มดวง พร้อมอธิบายหลักการทางดาราศาสตร์ให้ครอบครัวฟัง','การสังเกตการณ์อย่างเป็นระบบ, การถ่ายภาพวัตถุท้องฟ้าเบื้องต้น','บันทึกภาพลำดับการเกิดจันทรุปราคาได้ครบทุกขั้นตอน','hivis-violet'],
+            ['09','🏆','การแข่งขัน','แข่งขันตอบปัญหาวิทยาศาสตร์ระดับโรงเรียน','ตัวแทนนักเรียนเข้าร่วมการแข่งตอบปัญหาทางวิทยาศาสตร์ ครอบคลุมชีววิทยา เคมี และฟิสิกส์','การคำนวณและคิดวิเคราะห์อย่างรวดเร็วภายใต้เวลาจำกัด','ผ่านเข้ารอบชิงชนะเลิศระดับโรงเรียน','hivis-yellow'],
+            ['10','🎤','นิทรรศการ','เป็นตัวแทนโรงเรียนไปแข่งตอบปัญหาทางวิทยาศษสตร์ ช่วงสัปดาห์วิทย์','ตอบปัญหาเกี่ยวกับวิชาเคมี ชีวะ ฟิสิกส์ และ ดาราศาสตร์ ','การทำงานเป็นทีมเมื่อเวลามีจำกัดและแรงกดดันสูง, การใช้ความรู้มาตอบปัญหา','ได้รางวัลชนะเลิศมาจาากการแข่ง','hivis-pink'],
+        ];
+        const grid2 = document.getElementById('projects-grid');
+        projects.forEach(([num, icon, tag, title, desc, skills, result, accent]) => {
+            const card = document.createElement('div');
+            card.className = 'glow-card reveal flip-card bg-blueprint rounded-xl border border-hivis-cyan/10 transition duration-300';
+            card.innerHTML = `
+                <div class="flip-inner">
+                    <div class="flip-front bg-blueprint rounded-xl overflow-hidden border border-hivis-cyan/10">
+                        <div class="h-32 bg-blueprint-light border-b border-hivis-cyan/10 flex items-center justify-between px-6 relative overflow-hidden shrink-0">
+                            <span class="text-4xl font-extrabold text-white/10">${num}</span>
+                            <span class="p-3 bg-blueprint text-${accent} rounded-lg border border-${accent}/30">${icon}</span>
+                        </div>
+                        <div class="p-6 flex-1 flex flex-col justify-between">
+                            <div>
+                                <span class="text-xs font-semibold text-${accent} tracking-wide">${tag}</span>
+                                <h3 class="text-lg font-bold text-white mt-1 mb-2 font-display">${title}</h3>
+                                <p class="text-concrete text-sm leading-relaxed">${desc}</p>
+                            </div>
+                            <p class="text-[11px] text-concrete/70 mt-4 flex items-center gap-1">🔄 คลิกเพื่อดูรายละเอียดเพิ่มเติม</p>
+                        </div>
+                    </div>
+                    <div class="flip-back bg-blueprint-light rounded-xl border border-${accent}/40">
+                        <div>
+                            <span class="text-xs font-semibold text-${accent} tracking-wide">${tag} — รายละเอียด</span>
+                            <h3 class="text-base font-bold text-white mt-1 mb-3 font-display">${title}</h3>
+                            <p class="text-xs text-concrete-light mb-1"><strong class="text-white">ทักษะที่ได้ฝึก:</strong> ${skills}</p>
+                            <p class="text-xs text-concrete-light mt-3"><strong class="text-white">ผลลัพธ์:</strong> ${result}</p>
+                        </div>
+                        <p class="text-[11px] text-concrete/70 flex items-center gap-1">↩️ คลิกเพื่อย้อนกลับ</p>
+                    </div>
+                </div>
+            `;
+            card.addEventListener('click', () => {
+                card.classList.toggle('flipped');
+                playBlip(card.classList.contains('flipped') ? 440 : 340, 0.07);
+            });
+            grid2.appendChild(card);
+        });
+
+        // ---------- Scroll reveal (fade + slide up) ----------
+        const revealObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('in-view');
+                    revealObserver.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.15 });
+        document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+
+        // ---------- Skill bars fill in once visible ----------
+        const skillObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('filled');
+                    skillObserver.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.4 });
+        document.querySelectorAll('.skill-bar-fill').forEach(el => skillObserver.observe(el));
+
+        // ---------- Academic percentage count-up (ties in with the bar fill) ----------
+        function animatePercent(el) {
+            const target = parseInt(el.dataset.target, 10) || 0;
+            const duration = 1200;
+            const start = performance.now();
+            function tick(now) {
+                const progress = Math.min((now - start) / duration, 1);
+                const eased = 1 - Math.pow(1 - progress, 3);
+                el.textContent = Math.round(eased * target) + '%';
+                if (progress < 1) requestAnimationFrame(tick);
+            }
+            requestAnimationFrame(tick);
+        }
+        const pctObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    animatePercent(entry.target);
+                    pctObserver.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.4 });
+        document.querySelectorAll('.subject-pct').forEach(el => pctObserver.observe(el));
+
+        // ---------- GPAX ring + count-up number ----------
+        const gpaxValue = 3.98;
+        const gpaxMax = 4.0;
+        const gpaxRing = document.getElementById('gpax-ring-fill');
+        const gpaxCounter = document.getElementById('gpax-counter');
+        const ringCircumference = 2 * Math.PI * 26;
+
+        function animateGpax() {
+            const targetOffset = ringCircumference * (1 - gpaxValue / gpaxMax);
+            gpaxRing.style.strokeDashoffset = targetOffset;
+            const duration = 1500;
+            const start = performance.now();
+            function tick(now) {
+                const progress = Math.min((now - start) / duration, 1);
+                const eased = 1 - Math.pow(1 - progress, 3);
+                gpaxCounter.textContent = (eased * gpaxValue).toFixed(2);
+                if (progress < 1) requestAnimationFrame(tick);
+            }
+            requestAnimationFrame(tick);
+        }
+        const gpaxObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    animateGpax();
+                    gpaxObserver.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.5 });
+        gpaxObserver.observe(document.getElementById('gpax-ring-fill').closest('div'));
+
+        // ---------- 3D tilt on cards ----------
+        document.querySelectorAll('.glow-card').forEach(card => {
+            card.addEventListener('mousemove', (e) => {
+                const rect = card.getBoundingClientRect();
+                const px = (e.clientX - rect.left) / rect.width - 0.5;
+                const py = (e.clientY - rect.top) / rect.height - 0.5;
+                card.style.transform = `perspective(600px) rotateX(${py * -10}deg) rotateY(${px * 10}deg) translateY(-4px)`;
+            });
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = 'perspective(600px) rotateX(0) rotateY(0) translateY(0)';
+            });
+        });
+
+        // ---------- Fun click-burst sparks anywhere on the page ----------
+        const sparkColors = ['#F7E100', '#FF5A00', '#00E5FF', '#FF2E92', '#22FFA6', '#9D6BFF'];
+        function burstSparks(x, y, count = 12) {
+            for (let i = 0; i < count; i++) {
+                const s = document.createElement('div');
+                s.className = 'spark';
+                const size = 4 + Math.random() * 6;
+                const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5;
+                const dist = 40 + Math.random() * 50;
+                s.style.width = size + 'px';
+                s.style.height = size + 'px';
+                s.style.left = x + 'px';
+                s.style.top = y + 'px';
+                s.style.background = sparkColors[Math.floor(Math.random() * sparkColors.length)];
+                s.style.setProperty('--dx', Math.cos(angle) * dist + 'px');
+                s.style.setProperty('--dy', Math.sin(angle) * dist + 'px');
+                document.body.appendChild(s);
+                setTimeout(() => s.remove(), 700);
+            }
+        }
+        document.addEventListener('click', (e) => burstSparks(e.clientX, e.clientY, 10));
+
+        // ---------- Occasional shooting stars streaking across the page (astronomy) ----------
+        function spawnShootingStar() {
+            const star = document.createElement('div');
+            star.className = 'shooting-star';
+            star.style.top = (Math.random() * 50) + 'vh';
+            star.style.left = (40 + Math.random() * 55) + 'vw';
+            document.body.appendChild(star);
+            setTimeout(() => star.remove(), 1500);
+        }
+        setInterval(spawnShootingStar, 3200);
+        setTimeout(spawnShootingStar, 900);
     </script>
 </body>
 </html>
